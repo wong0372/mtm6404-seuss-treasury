@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 
 function Quotes() {
   const [quotes, setQuotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // backup quotes for api error
-  const backupQuotes = [
+  // backup quotes in case the api doesn't work
+  const fallbackQuotes = [
     {
       id: 1,
       quote:
@@ -64,35 +66,92 @@ function Quotes() {
     },
   ];
 
-  useEffect(() => {
-    // originally used to fetch quotes from the api like below:
-    // but dont know why the quotes cannot show on the page and keeps loading
-    // so i am now using hardcoded quotes as backup to make sure app works properly for the assignment
+  // if data isn't an array, use backup quotes
+  function formatQuotes(data) {
+    if (!Array.isArray(data)) {
+      console.log("API data isn't right, using backup quotes");
+      return fallbackQuotes;
+    }
 
-    /*
+    // go through each quote and fix it if needed
+    return data.map((item, index) => {
+      return {
+        id: item.id || index + 1,
+        quote: item.quote || item.text || item.title || "Quote not available",
+        book: item.book || item.source || item.from || "Dr. Seuss",
+      };
+    });
+  }
+
+  // get quotes from the API when the page loads
+  useEffect(() => {
+    setLoading(true);
+
+    // fetch the quotes from the API
     fetch("https://seussology.info/api/quotes/random/10")
-      .then((res) => res.json())
-      .then((data) => setQuotes(data))
+      .then((res) => {
+        // check if the response is ok
+        if (!res.ok) {
+          throw new Error("API not working");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // got quotes from API, now fix them if needed
+        console.log("Got quotes from API!");
+        let goodQuotes = formatQuotes(data);
+        setQuotes(goodQuotes);
+        setLoading(false);
+        setError(null);
+      })
       .catch((error) => {
-        console.error("Error fetching quotes:", error);
-        setQuotes(backupQuotes);
+        // if the API fails, use the backup quotes
+        console.log("API error:", error);
+        setQuotes(fallbackQuotes);
+        setError(
+          "Couldn't get quotes from the API right now. Showing some backup quotes instead."
+        );
+        setLoading(false);
       });
-    */
-    setQuotes(backupQuotes);
   }, []);
 
+  if (loading) {
+    return (
+      <div className="container">
+        <h1 className="mb-4 text-center">Dr. Seuss Quotes</h1>
+        <div className="text-center">
+          <div className="spinner-border" role="status"></div>
+          <p>Loading quotes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // show the quotes
   return (
     <div className="container">
       <h1 className="mb-4 text-center">Dr. Seuss Quotes</h1>
+
+      {error && <div className="alert alert-info mb-4">{error}</div>}
+
       <div className="row">
-        {quotes.map((quote) => (
-          <div className="col-12 mb-4" key={quote.id}>
+        {quotes.map((quote, index) => (
+          <div className="col-12 mb-4" key={quote.id || index}>
             <div className="card">
               <div className="card-body">
                 <blockquote className="mb-0">
-                  <p className="quote-text">{quote.quote}</p>
+                  <p className="quote-text">
+                    {typeof quote.quote === "string"
+                      ? quote.quote
+                      : "Quote not available"}
+                  </p>
                   <footer className="blockquote-footer">
-                    From <cite title={quote.book}>{quote.book}</cite>
+                    From{" "}
+                    <cite title={quote.book}>
+                      {typeof quote.book === "string"
+                        ? quote.book
+                        : "Dr. Seuss"}
+                    </cite>
                   </footer>
                 </blockquote>
               </div>
